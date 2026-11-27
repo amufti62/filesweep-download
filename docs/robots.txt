@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://amufti62.github.io/filesweep-download/sitemap.xml
