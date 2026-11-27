@@ -237,6 +237,23 @@ footer a{color:var(--ink);text-decoration:none;font-weight:700}
   .btn,.bin-ico{transition:none}
 }
 </style>
+<!-- Google Analytics 4: counts visits and Download / Buy clicks. Replace G-XXXXXXXXXX with the real Measurement ID. -->
+<script>
+  window.GA_ID = "G-XXXXXXXXXX";
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+  // No analytics cookies for visitors in the UK, EU and EEA unless consent is added later (cookieless pings only).
+  gtag("consent", "default", { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied",
+    region: ["GB","AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE","IS","LI","NO","CH"] });
+  gtag("consent", "default", { analytics_storage: "granted", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
+  if (/^G-[A-Z0-9]+$/.test(window.GA_ID) && window.GA_ID !== "G-XXXXXXXXXX") {
+    const s = document.createElement("script");
+    s.async = true; s.src = "https://www.googletagmanager.com/gtag/js?id=" + window.GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", window.GA_ID);
+  }
+</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -531,8 +548,34 @@ footer a{color:var(--ink);text-decoration:none;font-weight:700}
     document.title = extra.title[l];
     document.querySelectorAll(".tile.dup").forEach(t => t.dataset.copy = extra.copy[l]);
     try { localStorage.setItem("fs-lang", l); } catch (e) {}
+    updateLinks();
   }
-  document.getElementById("lang").addEventListener("click", () => setLang(lang === "ar" ? "en" : "ar"));
+  document.getElementById("lang").addEventListener("click", () => { setLang(lang === "ar" ? "en" : "ar"); keepLangInUrl(); });
+
+  /* ---------------- ?lang= links and click tracking ---------------- */
+  const params = new URLSearchParams(location.search);
+  const urlLang = params.get("lang");
+  // keep the address bar in step with the language, so a copied or shared link opens the same way
+  function keepLangInUrl() {
+    try { const u = new URL(location.href); u.searchParams.set("lang", lang); history.replaceState(null, "", u); } catch (e) {}
+  }
+  // carry the language to the privacy page and the Freemius checkout
+  function updateLinks() {
+    document.querySelectorAll('a[href^="privacy.html"]').forEach(a => { a.href = lang === "ar" ? "privacy.html?lang=ar#ar" : "privacy.html"; });
+    document.querySelectorAll('a[href*="checkout.freemius.com"]').forEach(a => {
+      try { const u = new URL(a.href); u.searchParams.set("language", lang); a.href = u.toString(); } catch (e) {}
+    });
+  }
+  function track(name, data) {
+    if (typeof gtag !== "function") return;
+    gtag("event", name, Object.assign({ page_language: lang, campaign: params.get("utm_campaign") || "(none)" }, data));
+  }
+  document.addEventListener("click", e => {
+    const a = e.target.closest("a");
+    if (!a) return;
+    if (a.hasAttribute("data-dl")) { track("download_click", { button: a.closest("header") ? "header" : (a.closest("section") || {}).id || (a.closest("section") || {}).className || "page" }); return; }
+    if (a.href.includes("checkout.freemius.com")) track("buy_click", { plan: a.href.includes("/licenses/3/") ? "3 PCs" : "1 PC" });
+  }, true);
 
   /* ---------------- sweep demo ---------------- */
   // [icon, name, MB, duplicateOf(index) or -1]
@@ -634,7 +677,8 @@ footer a{color:var(--ink);text-decoration:none;font-weight:700}
   // position the hint over the board, then the first-time language
   hint.style.left = "50%"; hint.style.top = "46%"; hint.style.transform = "translate(-50%,-50%)";
   let saved = null; try { saved = localStorage.getItem("fs-lang"); } catch (e) {}
-  setLang(saved || ((navigator.language || "").toLowerCase().startsWith("ar") ? "ar" : "en"));
+  // a ?lang=ar or ?lang=en link wins over the saved choice and the browser language
+  setLang(urlLang === "ar" || urlLang === "en" ? urlLang : (saved || ((navigator.language || "").toLowerCase().startsWith("ar") ? "ar" : "en")));
   refresh();
 })();
 </script>
